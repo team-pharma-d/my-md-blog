@@ -127,6 +127,7 @@ tags: ["Next.js", "SSG"]
 
 ## 工夫した点
 
+- 目次（TOC）を、見出しの id から自動生成して記事ページに表示した
 - md → HTML の変換を `unified` のパイプラインにして、見出し id（`rehypeSlug`）とコードの色付け（`rehypeHighlight`）をプラグインで追加できる構成にした
 - 一覧用（frontmatter だけ）と記事用（HTML 変換まで）で関数を分け、一覧の生成で無駄な変換をしない
 - 記事ごとの `title` / `description` を `generateMetadata` で出し分け、SEO スコア 100 を確認した
@@ -142,7 +143,6 @@ tags: ["Next.js", "SSG"]
 
 ## 今後の改善
 
-- 目次（TOC）の自動生成（`rehypeSlug` で付けた id を使う）
 - タグ別の一覧ページ
 - frontmatter に記事の要約（description）を追加し、メタタグに反映
 - RSS フィード、サイトマップの生成

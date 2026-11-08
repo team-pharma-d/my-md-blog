@@ -163,6 +163,38 @@ flowchart LR
 ### 6-5. 学び：class を付ける役と色を決める役は別
 `rehypeHighlight` が付けるのは `hljs-keyword` などの **class** だけで、実際の色は **CSS** が決める。そのため CSS を読み込む（Step 8 で `highlight.js/styles/...css` を import する）までは、画面上で色は付かない。
 
+### 6-6. 目次（TOC）の自動生成
+変換後の HTML から `h2` / `h3` を拾い、`{ id, text, level }` の配列にして、記事ページの上部に目次として表示した。
+
+```ts
+export function extractToc(html: string): TocItem[] {
+  const items: TocItem[] = [];
+  const pattern = /<h([23]) id="([^"]+)">(.*?)<\/h\1>/g;
+  for (const match of html.matchAll(pattern)) {
+    items.push({
+      level: Number(match[1]) as 2 | 3,
+      id: match[2],
+      text: match[3].replace(/<[^>]+>/g, ""),
+    });
+  }
+  return items;
+}
+```
+
+- **正規表現**：`<h2 id="…">…</h2>` と `<h3 id="…">…</h3>` を探す。`\1` は、開始タグと同じ番号（2 か 3）の閉じタグを指す
+- **`matchAll`**：見つかったものを順番に取り出す
+- **`replace(/<[^>]+>/g, "")`**：見出しの中に `<code>` などがあっても、文字だけを取り出す
+- **`id` を使う理由**：`rehypeSlug` が付けた `id` が、`href="#id"` のジャンプ先になる。つまり 6-2 の `rehypeSlug` が、目次の土台になっている
+- **階層の表現**：`level === 3` の項目は `ml-4`（左に余白）で右にずらし、h2 と h3 の階層を見せた
+- **見出しが無い記事**：`post.toc.length > 0` のときだけ目次を表示する
+
+```mermaid
+flowchart LR
+    A["HTML 文字列<br/>（id 付きの h2 / h3）"] -->|extractToc| B["{ id, text, level } の配列"]
+    B -->|map| C["目次のリンク一覧"]
+    C -->|"href=#id"| D["本文の見出しへジャンプ"]
+```
+
 ## 7. ページの作成
 ### 7-1. 一覧ページ（`app/page.tsx`）
 - `getAllPosts()` を呼び、`posts.map(...)` で記事カードを並べた
@@ -183,10 +215,18 @@ flowchart LR
 - Tailwind v4 では、プラグインは `app/globals.css` に `@plugin "@tailwindcss/typography";` と書いて有効にする（v3 の `tailwind.config.js` の `plugins` とは書き方が違う）
 - コードの色は `import "highlight.js/styles/github-dark.css";` で CSS を読み込んで付けた（6-5 の「class を付ける役と色を決める役は別」の対応）
 
-### 7-4. メタタグ（SEO）
+### 7-4. 目次の表示
+- `app/posts/[slug]/page.tsx` の `<article>` の上に `<nav>` を置き、`post.toc.map(...)` でリンクを並べた
+- 実装の詳細は 6-6 を参照
+
+### 7-5. メタタグ（SEO）
 - サイト全体：`app/layout.tsx` の `metadata`（title / description）と `<html lang="ja">`
 - 記事ごと：`generateMetadata` で `title: "記事タイトル | ブログ"` と `description` を出し分けた
 - 確認：ビルド後の `.next/server/app/posts/hello-ssg.html` に `<title>はじめてのSSG | ブログ</title>` が書き込まれていた
+
+### 7-6. tags の運用ルール
+- 表記ゆれを防ぐため、[tags-rule.md](tags-rule.md) に、個数（1記事最大3個）と表記（公式表記に統一、日本語は1つに決める）を定義した
+- 記事側も、ルールに合わせて `markdown` → `Markdown`、`highlight` → `ハイライト`、`deploy` → `デプロイ` に直した
 
 ## 8. つまずきと解決
 | 症状 | 原因 | 解決方法 |
@@ -303,5 +343,7 @@ Route (app)
 | 動的ルート | `[slug]` のようにフォルダ名を角括弧にして、可変の URL を表す仕組み |
 | generateStaticParams | ビルド時に、どの slug のページを作るかを Next.js に教える関数 |
 | generateMetadata | ページごとの title / description などのメタタグを出す関数 |
+| TOC | Table of Contents。記事の見出しを一覧にした目次 |
+| 正規表現 | 文字列から、パターンに合う部分を探すための記法 |
 | Lighthouse | Chrome の DevTools にある、ページの性能・アクセシビリティ・SEO などを採点するツール |
 | ReferenceError | 存在しない名前（変数・関数）を使ったときのエラー |
