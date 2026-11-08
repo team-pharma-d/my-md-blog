@@ -127,15 +127,23 @@ tags: ["Next.js", "SSG"]
 
 ## 工夫した点
 
-- 目次（TOC）を、見出しの id から自動生成して記事ページに表示した
 - md → HTML の変換を `unified` のパイプラインにして、見出し id（`rehypeSlug`）とコードの色付け（`rehypeHighlight`）をプラグインで追加できる構成にした
 - 一覧用（frontmatter だけ）と記事用（HTML 変換まで）で関数を分け、一覧の生成で無駄な変換をしない
 - 記事ごとの `title` / `description` を `generateMetadata` で出し分け、SEO スコア 100 を確認した
 - 開発中に出たエラーの原因と対処を、[学習ノート](docs/learning-note.md)の「つまずきと解決」に記録した
 
+## 自分で判断した点
+
+課題の指定に沿って、AI に任せる部分と自分で判断する部分を分けました。
+
+- **URL 設計**：`/posts/[slug]` にした。ファイル名をそのまま slug にすることで、記事の追加が「md を1つ置くだけ」で済み、URL に日付を入れない分、あとから日付を直してもリンクが変わらない
+- **SEO 用のメタタグ**：サイト全体は `layout.tsx` の `metadata`、記事ごとは `generateMetadata` で `記事タイトル | ブログ` を出し分けた。`<html lang="ja">` も指定した
+- **tags の運用ルール**：[docs/tags-rule.md](docs/tags-rule.md) に定義した（表記ゆれを防ぐため、表記と個数を決めた）
+
 ## 今後の改善
 
-- タグ別の一覧ページ、タグの表記ルールの整備
+- 目次（TOC）の自動生成（`rehypeSlug` で付けた id を使う）
+- タグ別の一覧ページ
 - frontmatter に記事の要約（description）を追加し、メタタグに反映
 - RSS フィード、サイトマップの生成
-- md のコードブロック以外（画像など）の最適化
+- 記事内の画像の最適化（`next/image` の利用）
