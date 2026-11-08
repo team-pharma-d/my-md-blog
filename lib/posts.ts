@@ -61,5 +61,25 @@ export async function getPostBySlug(slug: string) {
     date: data.date as string,
     tags: data.tags as string[],
     html: String(result),
+    toc: extractToc(String(result)),
   };
+}
+
+export type TocItem = {
+  id: string;
+  text: string;
+  level: 2 | 3;
+};
+
+export function extractToc(html: string): TocItem[] {
+  const items: TocItem[] = [];
+  const pattern = /<h([23]) id="([^"]+)">(.*?)<\/h\1>/g;
+  for (const match of html.matchAll(pattern)) {
+    items.push({
+      level: Number(match[1]) as 2 | 3,
+      id: match[2],
+      text: match[3].replace(/<[^>]+>/g, ""),
+    });
+  }
+  return items;
 }

@@ -1,7 +1,7 @@
 ---
 title: "markdownの基本"
 date: "2026-11-03"
-tags: ["Next.js", "markdown"]
+tags: ["Next.js", "Markdown"]
 ---
 
 ## markdownの基本

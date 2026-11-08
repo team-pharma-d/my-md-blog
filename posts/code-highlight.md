@@ -1,7 +1,7 @@
 ---
 title: "コードハイライトの仕組み"
 date: "2026-11-04"
-tags: ["Next.js", "highlight"]
+tags: ["Next.js", "ハイライト"]
 ---
 
 ## コードハイライトの仕組み

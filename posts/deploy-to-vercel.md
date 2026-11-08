@@ -1,7 +1,7 @@
 ---
 title: "Vercelにデプロイする"
 date: "2026-11-05"
-tags: ["Next.js", "deploy"]
+tags: ["Next.js", "デプロイ"]
 ---
 
 ## Vercelにデプロイする

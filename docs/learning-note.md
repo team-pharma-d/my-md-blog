@@ -1,13 +1,40 @@
 # 学習ノート：Next.js で作る Markdown ブログ（SSG）
 
 ## 1. この課題の目的
-- （ここに自分の言葉で書く）
+- Web 制作の依頼には「WordPress の代わりに、軽量な CMS が欲しい」というものが一定数ある。その典型的な解決策が、静的サイト生成（SSG）で作る Markdown ブログである
+- 目的は、`posts/` の md ファイルから、一覧ページと記事ページをビルド時に HTML として生成する仕組みを、自分の手で作って理解すること
+- 達成基準：① md 5本で `next build` が通る　② `/posts/[slug]` で見出し階層が正しく表示される　③ Lighthouse の Performance が 90 以上
+- 今回は、AI に答えを書かせず、手順に沿って自分で書いて動かすことを優先した。URL 設計・メタタグ・tags の運用ルールは自分で判断した
 
 ## 2. SSG とは
-- SSG / SSR / CSR の違い
-- ビルド時と実行時で、何が行われるか
 
-<!-- 図を入れる場所：SSG のビルド時 / 実行時の流れ -->
+### 2-1. SSG / SSR / CSR の違い
+| 方式 | HTML を作る場所とタイミング | 特徴 |
+|---|---|---|
+| SSG（Static Site Generation） | サーバー側で、**ビルド時**に全ページ分を先に作る | 表示が速い。サーバーの負荷が低い。内容の更新には再ビルドが必要 |
+| SSR（Server-Side Rendering） | サーバー側で、**リクエストのたび**に作る | 常に最新の内容を出せる。サーバーの処理が毎回必要で、SSG より遅くなりやすい |
+| CSR（Client-Side Rendering） | **ブラウザ**で JavaScript が作る | 画面の操作に強い。最初の表示が遅くなりやすく、SEO に不利なことがある |
+
+今回のブログは、記事が頻繁に変わらず、全員に同じ内容を見せればよいので、SSG が向いている。
+
+### 2-2. ビルド時と実行時で何が行われるか
+- **ビルド時**（`npm run build`）：md を読み込み、frontmatter を分離し、HTML に変換して、完成済みのページを書き出す。仕事の大半はここで終わる
+- **実行時**（ブラウザでアクセスしたとき）：できあがった HTML を返すだけ。md の読み込みも変換も行わない
+
+これが、SSG が速く、Lighthouse で高いスコアを出しやすい理由である。実際に `.next/server/app/posts/hello-ssg.html` を開き、見出しの `id` やコードの色付け用 class が、すでに書き込まれていることを確認した（9章）。
+
+```mermaid
+flowchart LR
+    subgraph build["ビルド時（npm run build）"]
+        A["posts/*.md"] --> B["読み込み・変換"]
+        B --> C["完成済みの HTML"]
+    end
+    subgraph run["実行時（ブラウザでアクセス）"]
+        D["ブラウザ"] -->|リクエスト| E["Vercel"]
+        E -->|完成済みの HTML を返すだけ| D
+    end
+    C --> E
+```
 
 ## 3. 環境構築で学んだこと
 ### 3-1. create-next-app の選択肢
@@ -24,8 +51,26 @@
 - 対処：ターミナルに表示された URL（`Local: http://localhost:3001`）にアクセスすればよい
 
 ## 4. App Router とファイル構成
-- `app/page.tsx` と `app/layout.tsx` の役割
-- 動的ルート `[slug]` の仕組み
+
+### 4-1. App Router
+`app/` 以下のフォルダ構成が、そのまま URL になる仕組み。
+
+| ファイル | URL | 役割 |
+|---|---|---|
+| `app/page.tsx` | `/` | 一覧ページ |
+| `app/posts/[slug]/page.tsx` | `/posts/hello-ssg` など | 記事ページ |
+
+### 4-2. layout.tsx と page.tsx の違い
+- `layout.tsx`：**全ページ共通の枠**。`<html>` や `<body>`、サイト全体のメタタグを持つ。中の `{children}` に、各ページの `page.tsx` の中身が差し込まれる
+- `page.tsx`：そのURL**固有の中身**
+
+### 4-3. 動的ルート `[slug]`
+- フォルダ名を `[slug]` のように角括弧にすると、URL の可変部分を表す。`/posts/hello-ssg` なら `slug = "hello-ssg"`
+- 1つのファイルで、記事の数だけページを作れる
+- SSG では、ビルド時にどの slug を作るかを `generateStaticParams` で Next.js に教える（7-2）
+
+### 4-4. Server Component
+`app/` のコンポーネントは、デフォルトで **Server Component**（サーバー側で実行される）。そのため `fs`（ファイル読み込み）が使え、`console.log` の出力もブラウザではなくターミナルに出る（5-4）。
 
 ## 5. 記事データの読み込み（lib/posts.ts）
 
