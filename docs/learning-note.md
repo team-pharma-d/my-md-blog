@@ -4,7 +4,7 @@
 - Web 制作の依頼には「WordPress の代わりに、軽量な CMS が欲しい」というものが一定数ある。その典型的な解決策が、静的サイト生成（SSG）で作る Markdown ブログである
 - 目的は、`posts/` の md ファイルから、一覧ページと記事ページをビルド時に HTML として生成する仕組みを、自分の手で作って理解すること
 - 達成基準：① md 5本で `next build` が通る　② `/posts/[slug]` で見出し階層が正しく表示される　③ Lighthouse の Performance が 90 以上
-- 今回は、AI に答えを書かせず、手順に沿って自分で書いて動かすことを優先した。URL 設計・メタタグ・tags の運用ルールは自分で判断した
+- 今回は、静的サイト生成を初めて学ぶため、md の読み込み・HTML への変換・ページ作成は、手順に沿って自分で書いて動かした。目次の自動生成は AI に任せ、URL 設計・メタタグ・tags の運用ルールは自分で判断した
 
 ## 2. SSG とは
 
@@ -122,7 +122,7 @@ flowchart TD
 1. `readFileSync` で md を読む
 2. `matter()` で `data` と `content` に分ける
 3. `unified()` のパイプラインで `content`（Markdown）を HTML に変換する
-4. `{ slug, title, date, tags, html }` を返す
+4. `{ slug, title, date, tags, html, toc }` を返す（`toc` は 6-6 の目次データ）
 
 変換は時間のかかる非同期処理なので、`async` 関数にして `await ... .process(content)` で完了を待つ。呼び出す側にも `await` が必要。
 
@@ -198,7 +198,7 @@ flowchart LR
 ## 7. ページの作成
 ### 7-1. 一覧ページ（`app/page.tsx`）
 - `getAllPosts()` を呼び、`posts.map(...)` で記事カードを並べた
-- `<Link href={`/posts/${post.slug}`}>` でカード全体を詳細ページへのリンクにした。`Link` は通常の `<a>` と違い、ページ全体を再読み込みせずに遷移する（クライアント遷移・プリフェッチ）
+- ``<Link href={`/posts/${post.slug}`}>`` でカード全体を詳細ページへのリンクにした。`Link` は通常の `<a>` と違い、ページ全体を再読み込みせずに遷移する（クライアント遷移・プリフェッチ）
 - `map` で並べる要素には `key`（React が要素を見分ける目印）が必要。記事は `post.slug`、タグは `tag` を使った
 - `getAllPosts` は `async` ではないので、`Home` に `async` / `await` は不要
 - Tailwind でグリッド（`grid gap-4 sm:grid-cols-2`）、枠線（`rounded-lg border`）、バッジ風タグ（`rounded-full bg-zinc-100`）にした
