@@ -19,35 +19,58 @@ export type PostMeta = {
   tags: string[];
 };
 
+// frontmatter が不正なときのエラー（ビルドを止める）
+function invalidFrontmatter(slug: string, reason: string): Error {
+  return new Error(`${slug}.md の frontmatter が不正（${reason}）`);
+}
+
+// frontmatter の中身を確認し、title / date / tags を取り出す
+function parseFrontmatter(
+  slug: string,
+  data: Record<string, unknown>,
+): Omit<PostMeta, "slug"> {
+  const { title, date, tags } = data;
+
+  if (typeof title !== "string" || title.trim() === "") {
+    throw invalidFrontmatter(slug, "title が文字列ではありません");
+  }
+  if (typeof date !== "string" || date.trim() === "") {
+    // 引用符なしの date: 2026-11-01 は、日付型として読み込まれてここに来る
+    throw invalidFrontmatter(slug, 'date が文字列ではありません。"2026-11-01" のように引用符で囲んでください');
+  }
+  // tags は省略可能（省略時は空の配列）。書く場合は文字列の配列にする
+  if (tags !== undefined && !(Array.isArray(tags) && tags.every((tag) => typeof tag === "string"))) {
+    throw invalidFrontmatter(slug, "tags が文字列の配列ではありません");
+  }
+
+  return { title, date, tags: Array.isArray(tags) ? tags : [] };
+}
+
 // 1) 全記事の一覧（日付の新しい順）
-export function getAllPosts(): PostMeta[] {
-　const slugs = getPostSlugs();
+export function getAllPosts(dir: string = postsDirectory): PostMeta[] {
+  const slugs = getPostSlugs(dir);
 
   const posts = slugs.map((slug) => {
-    const fileContents = fs.readFileSync(path.join(postsDirectory, `${slug}.md`), "utf8");
+    const fileContents = fs.readFileSync(path.join(dir, `${slug}.md`), "utf8");
     const { data } = matter(fileContents);
 
-    return {
-      slug,
-      title: data.title,
-      date: data.date,
-      tags: data.tags,
-    };
+    return { slug, ...parseFrontmatter(slug, data) };
   });
 
   return posts.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // 2) slug の一覧（generateStaticParams 用。Step 7 で使う）
-export function getPostSlugs(): string[] {
-  const fileNames = fs.readdirSync(postsDirectory);
+export function getPostSlugs(dir: string = postsDirectory): string[] {
+  const fileNames = fs.readdirSync(dir);
   const mdFiles = fileNames.filter((name) => name.endsWith(".md"));
   return mdFiles.map((name) => name.replace(".md", ""));
 }
-export async function getPostBySlug(slug: string) {
-  const fileContents = fs.readFileSync(path.join(postsDirectory, `${slug}.md`), "utf8");
+export async function getPostBySlug(slug: string, dir: string = postsDirectory) {
+  const fileContents = fs.readFileSync(path.join(dir, `${slug}.md`), "utf8");
   const { data, content } = matter(fileContents);
-    const result = await unified()
+  const meta = parseFrontmatter(slug, data);
+  const result = await unified()
     .use(remarkParse)
     .use(remarkRehype)
     .use(rehypeSlug)
@@ -57,9 +80,7 @@ export async function getPostBySlug(slug: string) {
 
   return {
     slug,
-    title: data.title as string,
-    date: data.date as string,
-    tags: data.tags as string[],
+    ...meta,
     html: String(result),
     toc: extractToc(String(result)),
   };
