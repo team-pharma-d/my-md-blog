@@ -339,10 +339,11 @@ Route (app)
 ### 9-4. デプロイと Lighthouse
 - デプロイ先：Vercel（GitHub の `main` ブランチを連携）。本番 URL：https://my-md-blog-mu.vercel.app
 - 計測条件：Chrome のシークレットウィンドウ、モバイル（iPhone 16 設定）、本番 URL
+- 2026-11-10 に、タグ修正・目次・メタタグ追加後の本番 URL で再計測した（初回は一覧 99 → 100 に。計測ごとのぶれの範囲）
 
 | ページ | Performance | Accessibility | Best Practices | SEO |
 |---|---|---|---|---|
-| 一覧（`/`） | 99 | 100 | 100 | 100 |
+| 一覧（`/`） | 100 | 100 | 100 | 100 |
 | 記事（`/posts/hello-ssg`） | 100 | 100 | 100 | 100 |
 
 ![Lighthouse 一覧ページ](images/lighthouse-top.png)

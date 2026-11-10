@@ -10,7 +10,7 @@ Next.js の **SSG（Static Site Generation）** で作った、Markdown ベー�
 
 - [x] `posts/` の `.md` を5本以上（現在6本）配置して `next build` が通る（すべての記事が静的 HTML として生成された）
 - [x] `/posts/[slug]` で見出し階層（h2 / h3）が正しく表示される
-- [x] Lighthouse の Performance が 90 以上（一覧 99 / 記事 100、モバイル・本番 URL で計測）
+- [x] Lighthouse の Performance が 90 以上（一覧・記事とも 100、モバイル・本番 URL で計測）
 
 加えて、次を実装しました。
 
@@ -94,7 +94,7 @@ Route (app)
 
 | ページ | Performance | Accessibility | Best Practices | SEO |
 |---|---|---|---|---|
-| 一覧（`/`） | 99 | 100 | 100 | 100 |
+| 一覧（`/`） | 100 | 100 | 100 | 100 |
 | 記事（`/posts/hello-ssg`） | 100 | 100 | 100 | 100 |
 
 | 一覧ページ | 記事ページ |
