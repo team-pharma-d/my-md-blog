@@ -12,9 +12,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteName = "Markdown ブログ（静的生成）";
+const siteDescription =
+  "Next.js の静的サイト生成（SSG）で作った、Markdown ベースの軽量ブログです。";
+
 export const metadata: Metadata = {
-  title: "Markdown ブログ（静的生成）",
-  description: "Next.js の静的サイト生成（SSG）で作った、Markdown ベースの軽量ブログです。",
+  // OpenGraph の URL などを、相対パスから絶対 URL に変換するための基準
+  metadataBase: new URL("https://my-md-blog-mu.vercel.app"),
+  title: siteName,
+  description: siteDescription,
+  openGraph: {
+    type: "website",
+    locale: "ja_JP",
+    siteName,
+    title: siteName,
+    description: siteDescription,
+    url: "/",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

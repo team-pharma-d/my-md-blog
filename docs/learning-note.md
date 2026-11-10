@@ -116,6 +116,20 @@ flowchart TD
 ### 5-4. console.log はターミナルに出る
 `console.log` の出力はブラウザではなく、`npm run dev` を実行しているターミナルに出た。`app/page.tsx` が Server Component（サーバー側で実行されるコンポーネント）であることの確認になった。
 
+### 5-5. frontmatter の検証
+書き間違いのある記事を気づかず公開しないよう、`parseFrontmatter` で中身を確認する。`getAllPosts` と `getPostBySlug` の両方で使う。
+
+| 項目 | 条件 | 不正なとき |
+|---|---|---|
+| `title` | 空でない文字列 | エラー |
+| `date` | 空でない文字列 | エラー |
+| `tags` | 文字列の配列（省略すると `[]`） | 書いて配列でなければエラー |
+| `description` | 空でない文字列（省略可） | 書いて空ならエラー |
+
+- 不正なら `throw new Error("○○.md の frontmatter が不正（理由）")` で**ビルドを止める**。どの記事の何が悪いかがメッセージで分かる
+- 学び：YAML では、引用符なしの `date: 2026-11-01` は**日付型**として読み込まれ、文字列にならない。`date: "2026-11-01"` と引用符で囲む必要がある。検証があるとこの書き忘れにすぐ気づける
+- 学び：`tags` は、省略したら `[]`、書き間違えたらエラー、と区別した。「書き間違いを見逃さない」ためである
+
 ## 6. Markdown → HTML 変換（remark / rehype）
 
 ### 6-1. getPostBySlug の中身
@@ -221,12 +235,19 @@ flowchart LR
 
 ### 7-5. メタタグ（SEO）
 - サイト全体：`app/layout.tsx` の `metadata`（title / description）と `<html lang="ja">`
-- 記事ごと：`generateMetadata` で `title: "記事タイトル | ブログ"` と `description` を出し分けた
+- 記事ごと：`generateMetadata` で `title: "記事タイトル | ブログ"` と、frontmatter の `description`（省略時はタイトルから作った固定文）を出し分けた
 - 確認：ビルド後の `.next/server/app/posts/hello-ssg.html` に `<title>はじめてのSSG | ブログ</title>` が書き込まれていた
 
 ### 7-6. tags の運用ルール
 - 表記ゆれを防ぐため、[tags-rule.md](tags-rule.md) に、個数（1記事最大3個）と表記（公式表記に統一、日本語は1つに決める）を定義した
 - 記事側も、ルールに合わせて `markdown` → `Markdown`、`highlight` → `ハイライト`、`deploy` → `デプロイ` に直した
+
+### 7-7. OpenGraph と canonical
+- `layout.tsx` に `metadataBase`（`https://my-md-blog-mu.vercel.app`）を設定すると、`canonical` や `og:url` に書いた相対パスが絶対 URL（`https://…`）に変換される
+- **OpenGraph（`og:*`）**：SNS などで URL を共有したときに表示される、タイトル・説明・サイト名などを指定する仕組み
+- **canonical**：「このページの正しい URL はこれ」と検索エンジンに伝える設定
+- 学び：ページの `openGraph` は、`layout.tsx` の設定と**統合されず丸ごと置き換わる**。そのため記事側にも `siteName` / `locale` を書いた
+- 確認：ビルド後の `hello-ssg.html` を `grep` して、`description` / `og:*` / `canonical` が記事ごとの内容・絶対 URL になっていることを確かめた
 
 ## 8. つまずきと解決
 | 症状 | 原因 | 解決方法 |
@@ -240,6 +261,8 @@ flowchart LR
 | `Cannot read properties of undefined (reading 'title')` | `getPostBySlug` に `return` がなく `undefined` が返った | `return { slug, title, date, tags, html }` を追加した |
 | `Unknown at rule @plugin` / `@theme`（VS Code の警告） | Tailwind v4 の独自記法を、VS Code 標準の CSS チェッカーが知らない | 動作に影響しない誤警告のため無視した（拡張機能 Tailwind CSS IntelliSense で消せる） |
 | Vercel の Import 一覧に `my-md-blog` が出ない | Vercel の GitHub アプリが「選択したリポジトリのみ」許可の設定で、新しいリポジトリが対象外だった | GitHub の設定（Repository access）で `my-md-blog` を追加して許可した |
+| `npm install -D vitest` で `ERESOLVE`（依存関係の衝突） | 最新の vitest が `@types/node` の 22 以上を求めるが、プロジェクトは `^20` だった | `npm install -D vitest @types/node@22` と同時に指定して解決した（`--force` は、条件が合わない組み合わせを入れてしまうので使わない） |
+| ビルド警告 `Dynamic filesystem access causes tracing of the whole project` | テストのため `fs` に渡すフォルダを引数 `dir` にしたことで、Turbopack が読む場所を判断できなくなった | `fs` の呼び出しに `/*turbopackIgnore: true*/` を付け、意図した動的アクセスだと伝えた |
 
 ### 8-1. `Home` の重複エラーの詳細
 
@@ -328,6 +351,21 @@ Route (app)
 - Performance 90 以上の達成基準を満たした
 - 高いスコアが出た理由：HTML がビルド時に完成していて、実行時に変換や API 取得が不要。画像もほぼ使っていない
 
+### 9-5. テスト（Vitest）と改善後のビルド
+`lib/posts.ts` の動作を `npm test`（`vitest run`）で自動確認できるようにした。テストは `lib/posts.test.ts` にある。
+
+| 対象 | 確認すること | 本数 |
+|---|---|---|
+| `getPostSlugs` | `.md` だけを拾い、拡張子を取り除く | 2 |
+| `getAllPosts` | 日付の新しい順に並ぶ。title / date / tags を取り出す | 2 |
+| frontmatter の検証 | 不正な title・date・tags・description でエラー。省略可の項目は省略できる | 8 |
+| `extractToc` | h2 / h3 の level・id・text。見出し内のタグを除去。h1・h4・id なしは対象外 | 4 |
+| サンプル記事 | h4 以降が目次に入らない。見出し内の code。ts・bash・json のハイライト | 3 |
+
+- **一時フォルダを使う**：関数に記事フォルダを指定する引数 `dir`（省略すると `posts/`）を足し、テストでは一時フォルダに記事を作って検証した。記事を増やしてもテストが壊れない
+- **サンプル記事**（`posts/heading-and-code-samples.md`）：h4・h5、見出し内の `code`、ts・bash・json・言語指定なしのコードブロックを含む。目次とハイライトが、いろいろな入力で動くことを確かめるための記事
+- 結果：`Tests 19 passed (19)`。`npm run build` も警告なしで通り、記事6本・全10ページが生成された
+
 ## 10. 用語集
 | 用語 | 意味 |
 |---|---|
@@ -346,4 +384,8 @@ Route (app)
 | TOC | Table of Contents。記事の見出しを一覧にした目次 |
 | 正規表現 | 文字列から、パターンに合う部分を探すための記法 |
 | Lighthouse | Chrome の DevTools にある、ページの性能・アクセシビリティ・SEO などを採点するツール |
+| Vitest | JavaScript / TypeScript のテストを書いて自動で実行するツール |
+| OpenGraph | URL を SNS などで共有したときに表示される、タイトル・説明・画像を指定する仕組み |
+| canonical | 同じ内容のページが複数の URL にあるとき、正しい URL を検索エンジンに伝える設定 |
+| metadataBase | メタタグの相対パスを絶対 URL に変換するための基準 URL |
 | ReferenceError | 存在しない名前（変数・関数）を使ったときのエラー |

@@ -8,7 +8,7 @@ import rehypeStringify from "rehype-stringify";
 import rehypeSlug from "rehype-slug";
 import rehypeHighlight from "rehype-highlight";
 
-// posts フォルダの絶対パス
+// posts フォルダの絶対パス（各関数の dir を省略したときの既定値）
 const postsDirectory = path.join(process.cwd(), "posts");
 
 // 記事1件分の frontmatter の型
@@ -17,6 +17,7 @@ export type PostMeta = {
   title: string;
   date: string;
   tags: string[];
+  description?: string; // 検索結果などに出す要約（省略可）
 };
 
 // frontmatter が不正なときのエラー（ビルドを止める）
@@ -29,7 +30,7 @@ function parseFrontmatter(
   slug: string,
   data: Record<string, unknown>,
 ): Omit<PostMeta, "slug"> {
-  const { title, date, tags } = data;
+  const { title, date, tags, description } = data;
 
   if (typeof title !== "string" || title.trim() === "") {
     throw invalidFrontmatter(slug, "title が文字列ではありません");
@@ -43,7 +44,12 @@ function parseFrontmatter(
     throw invalidFrontmatter(slug, "tags が文字列の配列ではありません");
   }
 
-  return { title, date, tags: Array.isArray(tags) ? tags : [] };
+  // description は省略可能。書く場合は空でない文字列にする
+  if (description !== undefined && (typeof description !== "string" || description.trim() === "")) {
+    throw invalidFrontmatter(slug, "description が空でない文字列ではありません");
+  }
+
+  return { title, date, tags: Array.isArray(tags) ? tags : [], description };
 }
 
 // 1) 全記事の一覧（日付の新しい順）
@@ -51,7 +57,7 @@ export function getAllPosts(dir: string = postsDirectory): PostMeta[] {
   const slugs = getPostSlugs(dir);
 
   const posts = slugs.map((slug) => {
-    const fileContents = fs.readFileSync(path.join(dir, `${slug}.md`), "utf8");
+    const fileContents = fs.readFileSync(/*turbopackIgnore: true*/ path.join(dir, `${slug}.md`), "utf8");
     const { data } = matter(fileContents);
 
     return { slug, ...parseFrontmatter(slug, data) };
@@ -62,12 +68,12 @@ export function getAllPosts(dir: string = postsDirectory): PostMeta[] {
 
 // 2) slug の一覧（generateStaticParams 用。Step 7 で使う）
 export function getPostSlugs(dir: string = postsDirectory): string[] {
-  const fileNames = fs.readdirSync(dir);
+  const fileNames = fs.readdirSync(/*turbopackIgnore: true*/ dir);
   const mdFiles = fileNames.filter((name) => name.endsWith(".md"));
   return mdFiles.map((name) => name.replace(".md", ""));
 }
 export async function getPostBySlug(slug: string, dir: string = postsDirectory) {
-  const fileContents = fs.readFileSync(path.join(dir, `${slug}.md`), "utf8");
+  const fileContents = fs.readFileSync(/*turbopackIgnore: true*/ path.join(dir, `${slug}.md`), "utf8");
   const { data, content } = matter(fileContents);
   const meta = parseFrontmatter(slug, data);
   const result = await unified()

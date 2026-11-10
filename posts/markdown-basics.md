@@ -1,5 +1,6 @@
 ---
 title: "markdownの基本"
+description: "見出し・太字・箇条書き・リンクなど、Markdown の基本的な書き方をまとめます。"
 date: "2026-11-03"
 tags: ["Next.js", "Markdown"]
 ---

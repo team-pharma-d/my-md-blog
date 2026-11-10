@@ -1,5 +1,6 @@
 ---
 title: "Vercelにデプロイする"
+description: "作成した Web サイトを Vercel にデプロイして、インターネット上に公開する流れを紹介します。"
 date: "2026-11-05"
 tags: ["Next.js", "デプロイ"]
 ---

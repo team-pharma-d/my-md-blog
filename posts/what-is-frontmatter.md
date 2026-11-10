@@ -1,5 +1,6 @@
 ---
 title: "frontmatterとは"
+description: "Markdown の先頭に書く管理情報「frontmatter」の役割と、title・date・tags の書き方を解説します。"
 date: "2026-11-02"
 tags: ["Next.js", "frontmatter"]
 ---

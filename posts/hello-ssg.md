@@ -1,5 +1,6 @@
 ---
 title: "はじめてのSSG"
+description: "ビルド時に HTML を生成する静的サイト生成（SSG）の考え方と、メリットを紹介します。"
 date: "2026-11-01"
 tags: ["Next.js", "SSG"]
 ---

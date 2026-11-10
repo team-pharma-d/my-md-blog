@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import "highlight.js/styles/github-dark.css";
 import { getPostBySlug, getPostSlugs } from "@/lib/posts";
 
@@ -9,12 +10,28 @@ export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
-}) {
+}): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPostBySlug(slug);
+  const title = `${post.title} | ブログ`;
+  // frontmatter の description を使う。無ければ、タイトルから作った文にする
+  const description = post.description ?? `${post.title}についての記事です。`;
+
   return {
-    title: `${post.title} | ブログ`,
-    description: `${post.title}についての記事です。`,
+    title,
+    description,
+    alternates: { canonical: `/posts/${slug}` },
+    // openGraph は layout.tsx の設定と統合されないため、共通の項目もここに書く
+    openGraph: {
+      type: "article",
+      locale: "ja_JP",
+      siteName: "Markdown ブログ（静的生成）",
+      title,
+      description,
+      url: `/posts/${slug}`,
+      publishedTime: post.date,
+      tags: post.tags,
+    },
   };
 }
 

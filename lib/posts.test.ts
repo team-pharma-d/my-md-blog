@@ -109,6 +109,24 @@ describe("frontmatter の検証", () => {
     expect(getAllPosts(dir)[0].tags).toEqual([]);
   });
 
+  it("description を書いた記事は、その内容を取り出す", () => {
+    writeRaw("with-desc", ['title: "A"', 'date: "2026-11-01"', 'description: "要約の文章"']);
+
+    expect(getAllPosts(dir)[0].description).toBe("要約の文章");
+  });
+
+  it("description を省略した記事は、undefined になる", () => {
+    writeRaw("no-desc", ['title: "A"', 'date: "2026-11-01"']);
+
+    expect(getAllPosts(dir)[0].description).toBeUndefined();
+  });
+
+  it("description が空の文字列の記事はエラーで止まる", () => {
+    writeRaw("empty-desc", ['title: "A"', 'date: "2026-11-01"', 'description: ""']);
+
+    expect(() => getAllPosts(dir)).toThrow("empty-desc.md の frontmatter が不正");
+  });
+
   it("getPostBySlug でも、不正な frontmatter はエラーで止まる", async () => {
     writeRaw("broken", ['title: "A"', "date: 2026-11-01"]);
 
@@ -154,5 +172,37 @@ describe("extractToc", () => {
 
   it("見出しが無い HTML では空の配列を返す", () => {
     expect(extractToc("<p>本文だけ</p>")).toEqual([]);
+  });
+});
+
+// posts/ に置いたサンプル記事を使った確認（さまざまな書き方でも動くこと）
+describe("サンプル記事 heading-and-code-samples", () => {
+  const slug = "heading-and-code-samples";
+
+  it("目次には h2 / h3 だけが入り、h4 以降は含まれない", async () => {
+    const post = await getPostBySlug(slug);
+
+    expect(post.toc.length).toBeGreaterThan(0);
+    expect(post.toc.every((item) => item.level === 2 || item.level === 3)).toBe(true);
+    expect(post.html).toContain("<h4");
+    expect(post.toc.some((item) => item.text === "並べ替えの仕組み")).toBe(false);
+  });
+
+  it("見出しの中の code は、目次ではタグを取り除いた文字になる", async () => {
+    const post = await getPostBySlug(slug);
+    const item = post.toc.find((entry) => entry.text.includes("getAllPosts"));
+
+    expect(item).toBeDefined();
+    expect(item?.text).toBe("getAllPosts と getPostSlugs の使い分け");
+    expect(item?.id).not.toBe("");
+  });
+
+  it("ts・bash・json のコードブロックに、それぞれハイライトが付く", async () => {
+    const { html } = await getPostBySlug(slug);
+
+    expect(html).toContain('class="hljs language-ts"');
+    expect(html).toContain('class="hljs language-bash"');
+    expect(html).toContain('class="hljs language-json"');
+    expect(html).toContain("hljs-");
   });
 });
