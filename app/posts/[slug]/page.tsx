@@ -43,7 +43,7 @@ export default async function PostPage({
   const { slug } = await params;
   const post = await getPostBySlug(slug);
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="mx-auto w-full max-w-3xl p-6">
       <h1 className="text-3xl font-bold">{post.title}</h1>
 <p className="mt-2 text-sm text-zinc-500">{post.date}</p>
       {post.toc.length > 0 && (
@@ -61,7 +61,7 @@ export default async function PostPage({
         </nav>
       )}
 <article
- className="prose prose-zinc mt-8 max-w-none"
+ className="prose prose-zinc prose-code:before:content-none prose-code:after:content-none mt-8 max-w-none [overflow-wrap:anywhere]"
  dangerouslySetInnerHTML={{ __html: post.html }}
  />
     </main>

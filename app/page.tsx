@@ -5,7 +5,7 @@ export default function Home() {
   const posts = getAllPosts();
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="mx-auto w-full max-w-3xl p-6">
       <h1 className="text-3xl font-bold mb-8">ブログ</h1>
       <ul className="grid gap-4 sm:grid-cols-2">
         {posts.map((post) => (
