@@ -367,7 +367,190 @@ Route (app)
 - **サンプル記事**（`posts/heading-and-code-samples.md`）：h4・h5、見出し内の `code`、ts・bash・json・言語指定なしのコードブロックを含む。目次とハイライトが、いろいろな入力で動くことを確かめるための記事
 - 結果：`Tests 19 passed (19)`。`npm run build` も警告なしで通り、記事6本・全10ページが生成された
 
-## 10. 用語集
+## 10. 処理の流れ（コードの追い方）
+
+ページにアクセスしたとき、どのファイルのどのプログラムが動き、結果が HTML のどこに出るのかを追う。
+
+### 10-1. 大前提：プログラムが動くのはビルド時だけ
+SSG では、プログラム（`lib/posts.ts`、各 `page.tsx`）が動くのは `npm run build`（Vercel のデプロイ時も同じ）の一度だけ。アクセス時は、できあがった HTML ファイルを返すだけで、md の読み込みも変換もしない。
+
+```mermaid
+flowchart LR
+    subgraph A["A. ビルド時（npm run build）"]
+        direction LR
+        A1["posts/*.md<br/>（材料）"] --> A2["lib/posts.ts<br/>（読んで変換）"]
+        A2 --> A3["app/ の page.tsx<br/>（画面の形に組む）"]
+        A3 --> A4[".next/server/app/<br/>HTML ファイル"]
+    end
+    subgraph B["B. アクセス時"]
+        direction LR
+        B1["ブラウザ"] --> B2["Vercel"]
+        B2 -->|"保存済みの HTML を<br/>そのまま返す"| B1
+    end
+    A4 -.->|"デプロイで配置"| B2
+```
+
+- `npm run dev`（開発中）だけは、アクセスのたびに A の処理が走る。だから、SSG の確認は `npm run build` で行う（9-2 参照）
+
+### 10-2. ビルド時に、どのページが作られるか
+Next.js は `app/` フォルダの構成を見て、作るページを決める。
+
+| ファイル | 作られる URL | 備考 |
+|---|---|---|
+| `app/layout.tsx` | （全ページ共通の枠） | `<html lang="ja">` と `<body>`。`{children}` の位置にページの中身が入る |
+| `app/page.tsx` | `/`（一覧） | |
+| `app/posts/[slug]/page.tsx` | `/posts/○○`（記事） | `[slug]` が可変部分。`generateStaticParams` が slug の一覧を返す |
+
+### 10-3. 一覧ページ `/` の流れ
+
+```mermaid
+sequenceDiagram
+    participant P as app/page.tsx<br/>Home()
+    participant G as lib/posts.ts<br/>getAllPosts()
+    participant S as lib/posts.ts<br/>getPostSlugs()
+    participant F as posts/*.md
+    P->>G: getAllPosts()（5行目）
+    G->>S: getPostSlugs(dir)（57行）
+    S->>F: readdirSync → .md だけに絞る
+    S-->>G: ["hello-ssg", "code-highlight", …]
+    loop slug ごと
+        G->>F: readFileSync（60行）
+        G->>G: matter() で frontmatter と本文に分離（61行）
+        G->>G: parseFrontmatter() で検証（63行）
+    end
+    G->>G: date の新しい順に sort（66行）
+    G-->>P: PostMeta の配列
+    P->>P: posts.map() で記事ごとにカードの HTML を作る（11行）
+```
+
+返ってきたデータが、HTML のどこに出るか。
+
+```
+getAllPosts の戻り値（1件）          →  HTML になった結果
+{ slug:"hello-ssg",                    <a href="/posts/hello-ssg">
+  title:"はじめてのSSG",                  <h2>はじめてのSSG</h2>
+  date:"2026-11-01",                      <p>2026-11-01</p>
+  tags:["Next.js","SSG"] }                <span>Next.js</span><span>SSG</span>
+```
+
+- 一覧に必要なのは frontmatter だけなので、本文の HTML 変換はしない（無駄な処理を避ける設計）
+
+### 10-4. 記事ページ `/posts/hello-ssg` の流れ
+`app/posts/[slug]/page.tsx` では、3つの関数が働く。
+
+| 順 | 関数 | 役割 | 呼ぶもの |
+|---|---|---|---|
+| ① | `generateStaticParams`（5–7行） | どの slug のページを作るかを決める | `getPostSlugs()` |
+| ② | `generateMetadata`（9–36行） | `<head>`（title / description / canonical / og）を作る | `getPostBySlug()` |
+| ③ | `PostPage`（38–69行） | `<body>`（h1・日付・目次・本文）を作る | `getPostBySlug()` |
+
+```mermaid
+flowchart TD
+    S["generateStaticParams<br/>getPostSlugs() の結果から<br/>slug の配列を作る"] --> N["Next.js が slug ごとに<br/>下の2つを呼ぶ"]
+    N --> M["generateMetadata<br/>→ &lt;head&gt; を作る"]
+    N --> PP["PostPage<br/>→ &lt;body&gt; を作る"]
+    M --> GP["getPostBySlug(slug)"]
+    PP --> GP
+    GP --> OUT["{ title, date, tags, description,<br/>html, toc }"]
+    OUT --> HEAD["&lt;title&gt; / description /<br/>canonical / og:*"]
+    OUT --> BODY["h1 / 日付 / 目次 / 本文"]
+```
+
+- `generateMetadata` と `PostPage` が、それぞれ `getPostBySlug` を呼ぶ。同じ記事を2回変換していて少し無駄だが、記事が数本のうちは問題ない
+
+### 10-5. 一番大事な関数 `getPostBySlug`（`lib/posts.ts` 75–93行）
+`hello-ssg.md` を例に、データの形が変わっていく様子を追う。
+
+```mermaid
+flowchart TD
+    A["① readFileSync（76行）<br/>ファイル全体を1つの文字列にする"] --> B["② matter（77行）<br/>frontmatter と本文に分ける"]
+    B --> C["data<br/>title / date / tags"]
+    B --> D["content<br/>本文の Markdown"]
+    C --> E["③ parseFrontmatter（78行）<br/>中身を検証して meta にする"]
+    D --> F["④ unified パイプライン（79–85行）"]
+    F --> G["⑤ return（87–92行）<br/>slug, meta, html, toc"]
+    E --> G
+```
+
+④の unified パイプラインは、次の順に1段ずつ変換する。
+
+| 段 | 役割 | 変換のイメージ |
+|---|---|---|
+| `remarkParse` | Markdown を構文木（mdast）にする | `## SSGとは` → 「見出しレベル2、中身は SSGとは」というデータ |
+| `remarkRehype` | HTML 用の構文木（hast）に変える | 見出しのデータ → `h2` 要素のデータ |
+| `rehypeSlug` | 見出しに `id` を付ける | `h2` に `id="ssgとは"` |
+| `rehypeHighlight` | コードブロックに色付け用の class を付ける | `<span class="hljs-keyword">const</span>` |
+| `rehypeStringify` | 構文木を HTML の文字列にする | `<h2 id="ssgとは">SSGとは</h2><p>…` |
+
+⑤で返る値は次の通り。
+
+```
+{ slug, title, date, tags, description,
+  html: "<h2 id=\"ssgとは\">SSGとは</h2><p>…",     ← ④の結果
+  toc:  extractToc(html) }                         ← 目次用データ
+```
+
+- `extractToc`（101–112行）は、HTML の文字列から、正規表現で `<h2 id="…">…</h2>` と `<h3 …>` だけを探して `[{ level: 2, id: "ssgとは", text: "SSGとは" }, …]` を作る。h4 以降は拾わない
+
+### 10-6. `post` が HTML のどこに出るか（`PostPage`）
+
+| `post` の中身 | コードの場所 | HTML での表示 |
+|---|---|---|
+| `post.title` | 47行 | `<h1>` の文字 |
+| `post.date` | 48行 | 日付の `<p>` |
+| `post.toc` | 49–62行 | `map` で `<li><a href="#ssgとは">SSGとは</a></li>` を並べた目次 |
+| `post.html` | 63–66行 | `<article>` の中身 |
+
+- 66行目の `dangerouslySetInnerHTML={{ __html: post.html }}` が、変換済みの HTML 文字列を、そのまま `<article>` の中に差し込む。「dangerously」は「渡した文字列を HTML として信用して入れる」という意味。自分が書いた md だけを変換しているので問題ない
+- 組み上がった HTML は、`.next/server/app/posts/hello-ssg.html` などに保存される
+
+### 10-7. アクセス時の流れ
+
+```mermaid
+sequenceDiagram
+    participant U as ブラウザ
+    participant V as Vercel
+    participant H as hello-ssg.html（保存済み）
+    U->>V: /posts/hello-ssg にアクセス
+    V->>H: 該当する HTML ファイルを探す
+    H-->>V: 完成済みの HTML
+    V-->>U: そのまま返す（計算なし）
+    U->>U: HTML を読み、CSS を適用して表示
+```
+
+- 記事の読み込みも変換も、このときは起きない。Lighthouse のスコアが高いのは、これが理由（9-4 参照）
+
+### 10-8. コードを追うコツ
+プログラムが別のファイルに移るときの目印は、次の3つ。
+
+| 目印 | 見方 |
+|---|---|
+| `import { 関数名 } from "…"` | その関数は `from` のファイルにある。`@/lib/posts` の `@/` は、プロジェクトの直下 |
+| `関数名()` の呼び出し | その関数の定義に移って、中身を読む |
+| `return` の値 | 呼び出し元の変数に入る。`const posts = getAllPosts();` なら、戻り値が `posts` |
+
+実際に追うときの方法は、次の3つ。
+
+- **`console.log` を入れる**：サーバー側で動くコードなので、出力はブラウザではなく、`npm run dev` を動かしているターミナルに出る（5-4 参照）。たとえば `getPostBySlug` の `return` の直前に `console.log(meta)` を入れると、データの形を確かめられる
+- **結果の HTML を見る**：`.next/server/app/posts/hello-ssg.html` を開くと、`<h2 id="ssgとは">` や `hljs-…` の class が書き込まれた状態を確認できる。「プログラムの結果が、HTML のどこに出たか」を確かめる、一番確実な方法
+- **ブラウザで「ページのソースを表示」**：本番でも、同じ HTML が見える
+
+### 10-9. まとめ（全体を1枚で）
+
+```
+npm run build
+ ├ app/layout.tsx            全ページ共通の <html><body> の枠
+ ├ app/page.tsx              Home() → getAllPosts() → [getPostSlugs()]
+ │                           → カード一覧の HTML  → /（index.html）
+ └ app/posts/[slug]/page.tsx
+     ├ generateStaticParams()  → getPostSlugs()     … 作るページ（slug）を決める
+     ├ generateMetadata()      → getPostBySlug()    … <head>（title, og など）
+     └ PostPage()              → getPostBySlug()    … <body>（h1, 目次, 本文）
+          getPostBySlug: 読む → matter → 検証 → unified で HTML 化 → toc 抽出
+     → /posts/○○.html（記事の数だけ）
+```
+
+## 11. 用語集
 | 用語 | 意味 |
 |---|---|
 | SSG | Static Site Generation。ビルド時に全ページの HTML を先に作っておく方式 |
